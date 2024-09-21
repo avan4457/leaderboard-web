@@ -92,10 +92,10 @@ const Leaderboard: React.FC = () => {
 
   // Chart data for top 3 users
   const chartData = {
-    labels: topUsers.map((user) => user.username),
+    labels: topUsers.map((user, index) => `${index + 1} ${user.username}`),
     datasets: [
       {
-        label: "pts",
+        label: "Points",
         data: topUsers.map(
           (user) =>
             user.stats[StatType.KILL_COUNT] - user.stats[StatType.DEATH_COUNT]
@@ -126,10 +126,10 @@ const Leaderboard: React.FC = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Username</TableCell>
+                <TableCell>Name</TableCell>
                 <TableCell align="center">Kill count</TableCell>
                 <TableCell align="center">Death count</TableCell>
-                <TableCell align="center">pts</TableCell>
+                <TableCell>Points</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -176,7 +176,7 @@ const Leaderboard: React.FC = () => {
                       onBlur={() => handleBlur(user.id, StatType.DEATH_COUNT)}
                     />
                   </TableCell>
-                  <TableCell>
+                  <TableCell align="center">
                     {user.stats[StatType.KILL_COUNT] -
                       user.stats[StatType.DEATH_COUNT]}
                   </TableCell>
