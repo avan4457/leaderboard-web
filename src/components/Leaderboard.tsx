@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import axios from "axios";
 import { User } from "../utils/types";
 import { StatType } from "../utils/enums";
@@ -13,7 +13,6 @@ import {
   TableRow,
   TextField,
 } from "@mui/material";
-
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -24,38 +23,70 @@ import {
   Legend,
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
+import useFetchUsers from "../hooks/UseFetchUsers";
+
+// UserRow component
+const UserRow: React.FC<{
+  user: User;
+  editedStats: { [key: number]: User["stats"] };
+  handleStatChange: (userId: number, statType: StatType, value: number) => void;
+  handleBlur: (userId: number, statType: StatType) => void;
+}> = ({ user, editedStats, handleStatChange, handleBlur }) => (
+  <TableRow key={user.id}>
+    <TableCell
+      component="th"
+      scope="row"
+      style={{ display: "flex", gap: 10, alignItems: "center" }}
+    >
+      <Avatar /> {user.username}
+    </TableCell>
+    <TableCell>
+      <TextField
+        type="number"
+        value={
+          editedStats[user.id]?.[StatType.KILL_COUNT] ??
+          user.stats[StatType.KILL_COUNT]
+        }
+        onChange={(e) =>
+          handleStatChange(
+            user.id,
+            StatType.KILL_COUNT,
+            parseInt(e.target.value, 10)
+          )
+        }
+        onBlur={() => handleBlur(user.id, StatType.KILL_COUNT)}
+      />
+    </TableCell>
+    <TableCell>
+      <TextField
+        type="number"
+        value={
+          editedStats[user.id]?.[StatType.DEATH_COUNT] ??
+          user.stats[StatType.DEATH_COUNT]
+        }
+        onChange={(e) =>
+          handleStatChange(
+            user.id,
+            StatType.DEATH_COUNT,
+            parseInt(e.target.value, 10)
+          )
+        }
+        onBlur={() => handleBlur(user.id, StatType.DEATH_COUNT)}
+      />
+    </TableCell>
+    <TableCell align="center">
+      {user.stats[StatType.KILL_COUNT] - user.stats[StatType.DEATH_COUNT]}
+    </TableCell>
+  </TableRow>
+);
 
 const Leaderboard: React.FC = () => {
-  const [users, setUsers] = useState<User[]>([]);
-  const [topUsers, setTopUsers] = useState<User[]>([]);
+  const { users, topUsers, fetchAllUsers, fetchTopUsers } = useFetchUsers();
   const [editedStats, setEditedStats] = useState<{
     [key: number]: User["stats"];
   }>({});
 
-  const fetchAllUsers = () => {
-    axios
-      .get(`${process.env.REACT_APP_API_BASE_URL}/users`)
-      .then((response) => {
-        setUsers(response.data.data);
-      })
-      .catch((error) => console.error(error));
-  };
-
-  const fetchTopUsers = () => {
-    axios
-      .get(`${process.env.REACT_APP_API_BASE_URL}/users?top=3`)
-      .then((response) => {
-        setTopUsers(response.data.data);
-      })
-      .catch((error) => console.error(error));
-  };
-
-  useEffect(() => {
-    fetchAllUsers();
-    fetchTopUsers();
-  }, []);
-
-  // Handle stat change and save it to state on blur
+  // Handle stat change and save it to state
   const handleStatChange = (
     userId: number,
     statType: StatType,
@@ -70,23 +101,23 @@ const Leaderboard: React.FC = () => {
     }));
   };
 
-  // Handle stat update on blur event (when the user unselects the input)
-  const handleBlur = (userId: number, statType: StatType) => {
+  // Handle stat update on blur event
+  const handleBlur = async (userId: number, statType: StatType) => {
     const updatedStat = editedStats[userId]?.[statType];
-
-    // Only update if there is a new value
     if (updatedStat !== undefined) {
-      axios
-        .put(`${process.env.REACT_APP_API_BASE_URL}/users/${userId}`, {
-          stat: statType,
-          value: updatedStat,
-        })
-        .then((response) => {
-          console.log(response.data);
-          fetchAllUsers();
-          fetchTopUsers();
-        })
-        .catch((error) => console.error(error));
+      try {
+        await axios.put(
+          `${process.env.REACT_APP_API_BASE_URL}/users/${userId}`,
+          {
+            stat: statType,
+            value: updatedStat,
+          }
+        );
+        await fetchAllUsers();
+        await fetchTopUsers();
+      } catch (error) {
+        console.error("Error updating stats", error);
+      }
     }
   };
 
@@ -134,60 +165,20 @@ const Leaderboard: React.FC = () => {
             </TableHead>
             <TableBody>
               {users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell
-                    component="th"
-                    scope="row"
-                    style={{ display: "flex", gap: 10, alignItems: "center" }}
-                  >
-                    <Avatar /> {user.username}
-                  </TableCell>
-                  <TableCell>
-                    <TextField
-                      type="number"
-                      value={
-                        editedStats[user.id]?.[StatType.KILL_COUNT] ??
-                        user.stats[StatType.KILL_COUNT]
-                      }
-                      onChange={(e) =>
-                        handleStatChange(
-                          user.id,
-                          StatType.KILL_COUNT,
-                          parseInt(e.target.value, 10)
-                        )
-                      }
-                      onBlur={() => handleBlur(user.id, StatType.KILL_COUNT)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <TextField
-                      type="number"
-                      value={
-                        editedStats[user.id]?.[StatType.DEATH_COUNT] ??
-                        user.stats[StatType.DEATH_COUNT]
-                      }
-                      onChange={(e) =>
-                        handleStatChange(
-                          user.id,
-                          StatType.DEATH_COUNT,
-                          parseInt(e.target.value, 10)
-                        )
-                      }
-                      onBlur={() => handleBlur(user.id, StatType.DEATH_COUNT)}
-                    />
-                  </TableCell>
-                  <TableCell align="center">
-                    {user.stats[StatType.KILL_COUNT] -
-                      user.stats[StatType.DEATH_COUNT]}
-                  </TableCell>
-                </TableRow>
+                <UserRow
+                  key={user.id}
+                  user={user}
+                  editedStats={editedStats}
+                  handleStatChange={handleStatChange}
+                  handleBlur={handleBlur}
+                />
               ))}
             </TableBody>
           </Table>
         </TableContainer>
       </div>
       <div className="section">
-        <h2>Top 3 Users Chart</h2>
+        <h2>Top 3 Users</h2>
         <Bar data={chartData} />
       </div>
     </div>
